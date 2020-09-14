@@ -68,6 +68,13 @@ void setup() {
 }
 
 void loop() {
+
+    while (Can0.available())
+    {
+        Can0.read(inMsg);
+        decodeCAN();
+
+    }
     parameterMap();
     boostMap();
     idleThrottle();
