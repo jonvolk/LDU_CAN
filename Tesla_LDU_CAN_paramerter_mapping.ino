@@ -296,7 +296,7 @@ void regenStuff() {
 }
 
 void idleThrottle() {
-    if (rpm < 35) {
+    if (run == 0) {
         msg.id = 0x601; //set parameter ID
         msg.len = 8;
         msg.buf[0] = 0x40; //CMD
@@ -325,30 +325,9 @@ void idleThrottle() {
     }
 
 
-    if (rpm == 0) {
-        startup = true;
-    }
-    if (rpm > 200) {
-        startup = false;
-    }
-
-    if (startup == true && brake == 0) {
-
-        if (idleThrot <= (27 * 32)) {
-            idleThrot += 4;
-        }
-
-    }
-    if (startup == true && brake == 1) {
-        idleThrot = (8 * 32);
-        
-    }
-
-    if (startup == false) {
-        idleThrot = map(pot2, 600, 1150, (27 * 32), 0);
-    }
 
 
+    idleThrot = map(pot2, 600, 1150, (27 * 32), 0);
     iThrotByte1 = idleThrot & 0xFF;
     iThrotByte2 = (idleThrot >> 8) & 0xFF;
 
