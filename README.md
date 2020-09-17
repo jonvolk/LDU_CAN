@@ -5,7 +5,7 @@ Mapping of inverter parameters over CAN
 Must use brake pressure input on POT2!
 Parameter index values based on SINE Firmware 4.90.R!
 
-Openinvertercustom CAN mapping. 
+Openinverter custom CAN mapping. 
 
 opmode,310,0,8,1,TX
 
