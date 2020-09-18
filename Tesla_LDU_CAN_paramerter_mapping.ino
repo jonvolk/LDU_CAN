@@ -1,5 +1,6 @@
 #include <Arduino.h>
 #include <FlexCAN.h> //https://github.com/teachop/FlexCAN_Library 
+#include <Smoothed.h> //https://github.com/MattFryer/Smoothed
 
 
 
@@ -45,6 +46,11 @@ CAN_message_t msg;
 CAN_message_t inMsg;
 CAN_filter_t filter;
 
+//////////////Smoothing///////////////
+
+Smoothed <int> idleRamp;
+Smoothed <float> fslipRamp;
+
 
 void setup() {
 
@@ -65,6 +71,8 @@ void setup() {
     digitalWrite(led, HIGH);
     Serial.begin(1152000);
 
+    idleRamp.begin(SMOOTHED_AVERAGE, 60);
+    fslipRamp.begin(SMOOTHED_AVERAGE, 60);
 }
 
 void loop() {
@@ -152,6 +160,8 @@ void parameterMap() {
     Can0.write(msg);
 
     //slip max
+
+
     maxSlip = (3.08 * 32);
     if (pot >= 2800) {
         minSlip = map(pot, 2800, 4095, (.84 * 32), maxSlip);
@@ -159,10 +169,13 @@ void parameterMap() {
     }
     else { minSlip = (.84 * 32); }
 
-    if (rpm <= 4200) {
+    if (rpm <= 4500) {
         fslip = map(rpm, 0, 4200, minSlip, maxSlip);
     }
     else { fslip = maxSlip; }
+
+    fslipRamp.add(fslip);
+
     //fslipmax
     msg.id = 0x601; //set parameter ID
     msg.len = 8;
@@ -170,7 +183,7 @@ void parameterMap() {
     msg.buf[1] = 0x00;
     msg.buf[2] = 0x20; //
     msg.buf[3] = 0x05;//index:boost=0
-    msg.buf[4] = fslip;
+    msg.buf[4] = fslipRamp.get();
     msg.buf[5] = 0x00;//258=8102=0x2000
     msg.buf[6] = 0x00;
     msg.buf[7] = 0x00;
@@ -178,17 +191,7 @@ void parameterMap() {
 
     // throtramp
 
-    if (rpm < 2000 && pot < 3000) {
-        throtRamp = (8 * 32);
-    }
-    else if (rpm >= 2000 && rpm <= 4500) {
-        throtRamp = map(rpm, 2000, 4500, (8 * 32), (25 * 32));
-    }
-    else {
-        throtRamp = (25 * 32);
-    }
-
-    
+    throtRamp = (15 * 32);
     throtByte1 = throtRamp & 0xFF;
     throtByte2 = (throtRamp >> 8) & 0xFF;
 
@@ -203,6 +206,7 @@ void parameterMap() {
     msg.buf[6] = 0x00;
     msg.buf[7] = 0x00;
     Can0.write(msg);
+
 
 
 
@@ -327,7 +331,9 @@ void idleThrottle() {
 
 
 
-    idleThrot = map(pot2, 600, 1150, (27 * 32), 0);
+    idleRamp.add(pot2);
+    //idleThrot = map(pot2, 600, 1150, (27 * 32), 0);
+    idleThrot = map(idleRamp.get(), 600, 1150, (27 * 32), 0);
     iThrotByte1 = idleThrot & 0xFF;
     iThrotByte2 = (idleThrot >> 8) & 0xFF;
 
@@ -336,7 +342,7 @@ void idleThrottle() {
     msg.buf[0] = 0x40; //CMD
     msg.buf[1] = 0x00;
     msg.buf[2] = 0x20; //
-    msg.buf[3] = 63;//index
+    msg.buf[3] = 63;//index idlethrotlim
     msg.buf[4] = iThrotByte1;
     msg.buf[5] = iThrotByte2;
     msg.buf[6] = 0x00;
