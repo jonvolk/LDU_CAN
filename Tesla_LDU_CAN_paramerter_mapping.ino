@@ -20,25 +20,23 @@ int dir = 0;
 int brake;
 int boost;
 int maxBoost;
-int throtByte1;
-int throtByte2;
 int throtRamp;
 int pot2;
+int fweak;
+int minBoost;
 int brkNomPedal;
 int brkMax;
-int brakeByte1;
-int brakeByte2;
-int regenByte1;
-int regenByte2;
 int baseRegen;
 int maxRegen;
 int idleThrot;
-int iThrotByte1;
-int iThrotByte2;
+int ampMin;
+int slipstart;
+int idleRPM;
 int neg = 4294967295;
 float maxSlip;
 float minSlip;
 float fslip;
+float fslipmin;
 bool startup;
 
 
@@ -73,6 +71,7 @@ void setup() {
 
     idleRamp.begin(SMOOTHED_AVERAGE, 60);
     fslipRamp.begin(SMOOTHED_AVERAGE, 60);
+
 }
 
 void loop() {
@@ -81,12 +80,13 @@ void loop() {
     {
         Can0.read(inMsg);
         decodeCAN();
-
     }
+
     parameterMap();
     boostMap();
     idleThrottle();
     regenStuff();
+   
 }
 
 
@@ -144,30 +144,27 @@ void decodeCAN() {
 
 
 void parameterMap() {
-    //boost max
-    maxBoost = 215;
+
+    //boost
+    maxBoost = 1720;
+    minBoost = 1360;
+
     //fweak
-    msg.id = 0x601; //set parameter ID
-    msg.len = 8;
-    msg.buf[0] = 0x40; //CMD
-    msg.buf[1] = 0x00;
-    msg.buf[2] = 0x20; //
-    msg.buf[3] = 0x01;//index:boost=0
-    msg.buf[4] = 0x00;
-    msg.buf[5] = 0x20;//258=8102=0x2000
-    msg.buf[6] = 0x00;
-    msg.buf[7] = 0x00;
-    Can0.write(msg);
-
-    //slip max
+    fweak = 258;
+    canSet(1, fweak);
 
 
+    //fslipmin
+    fslipmin = .84;
+    canSet(4, fslipmin);
+
+    //fslipmax
     maxSlip = (3.08 * 32);
     if (pot >= 2800) {
-        minSlip = map(pot, 2800, 4095, (.84 * 32), maxSlip);
+        minSlip = map(pot, 2800, 4095, fslipmin * 32, maxSlip);
 
     }
-    else { minSlip = (.84 * 32); }
+    else { minSlip = fslipmin *32 ; }
 
     if (rpm <= 4500) {
         fslip = map(rpm, 0, 4200, minSlip, maxSlip);
@@ -175,180 +172,101 @@ void parameterMap() {
     else { fslip = maxSlip; }
 
     fslipRamp.add(fslip);
-
-    //fslipmax
-    msg.id = 0x601; //set parameter ID
-    msg.len = 8;
-    msg.buf[0] = 0x40; //CMD
-    msg.buf[1] = 0x00;
-    msg.buf[2] = 0x20; //
-    msg.buf[3] = 0x05;//index:boost=0
-    msg.buf[4] = fslipRamp.get();
-    msg.buf[5] = 0x00;//258=8102=0x2000
-    msg.buf[6] = 0x00;
-    msg.buf[7] = 0x00;
-    Can0.write(msg);
+    canSet(5, fslipRamp.get()/32);
 
     // throtramp
+    throtRamp = 25;
+    canSet(49, throtRamp);
 
-    throtRamp = (15 * 32);
-    throtByte1 = throtRamp & 0xFF;
-    throtByte2 = (throtRamp >> 8) & 0xFF;
-
-    msg.id = 0x601; //set parameter ID
-    msg.len = 8;
-    msg.buf[0] = 0x40; //CMD
-    msg.buf[1] = 0x00;
-    msg.buf[2] = 0x20;
-    msg.buf[3] = 49;//index
-    msg.buf[4] = throtByte1;
-    msg.buf[5] = throtByte2;
-    msg.buf[6] = 0x00;
-    msg.buf[7] = 0x00;
-    Can0.write(msg);
+    //ampmin
+    ampMin = 1;
+    canSet(51, ampMin);
 
 
-
+    //slipstart
+    slipstart = 29;
+    canSet(52, slipstart);
 
 }
 void boostMap()
 {
     if (pot > 3700) {
-
-        boost = map(pot, 2700, 4095, 100, maxBoost);
-
-        msg.id = 0x601; //set parameter ID
-        msg.len = 8;
-        msg.buf[0] = 0x40; //CMD
-        msg.buf[1] = 0x00;
-        msg.buf[2] = 0x20; //
-        msg.buf[3] = 0x00;//index:boost=0, count down for index number
-        msg.buf[4] = 0x00;
-        msg.buf[5] = boost;//value x 32
-        msg.buf[6] = 0x00;
-        msg.buf[7] = 0x00;
-        Can0.write(msg);
+        boost = map(pot, 3700, 4095, minBoost, maxBoost);
+        canSet(0, boost);
     }
-
     else {
-        msg.id = 0x601; //set parameter ID
-        msg.len = 8;
-        msg.buf[0] = 0x40; //CMD
-        msg.buf[1] = 0x00; //
-        msg.buf[2] = 0x20; //
-        msg.buf[3] = 0x00;
-        msg.buf[4] = 0x00;
-        msg.buf[5] = 175;//value x 32
-        msg.buf[6] = 0x00;
-        msg.buf[7] = 0x00;
-        Can0.write(msg);
+        boost = minBoost;
+        canSet(0, boost);
     }
 
 }
 
 void regenStuff() {
 
-    //baseRegen
-   
     baseRegen = 45;
-    maxRegen = 90;
 
     //brakenompedal
     if (pot2 > 3700) {
-        brkNomPedal = (neg - (maxRegen * 32));
+        brkNomPedal = ((neg - (maxRegen * 32)) / 32);
     }
-
     else {
-        brkNomPedal = map(pot2, 600, 3700, (neg - (baseRegen * 32)), (neg - (maxRegen * 32)));
+        brkNomPedal = map(pot2, 600, 3700, ((neg - (baseRegen * 32)) / 32), ((neg - (maxRegen * 32))) / 32);
     }
-
-    //brkNomPedal = (neg -  (11 * 32));
-
-    brakeByte1 = brkNomPedal & 0xFF;
-    brakeByte2 = (brkNomPedal >> 8) & 0xFF;
-
-
-    msg.id = 0x601; //set parameter ID
-    msg.len = 8;
-    msg.buf[0] = 0x40; //CMD SET
-    msg.buf[1] = 0x00;
-    msg.buf[2] = 0x20;
-    msg.buf[3] = 53;//index
-    msg.buf[4] = brakeByte1;
-    msg.buf[5] = brakeByte2;
-    msg.buf[6] = 0xFF;
-    msg.buf[7] = 0xFF;
-    Can0.write(msg);
+    canSet(53, brkNomPedal);
 
     //brakemax
-    brkMax = (neg - (baseRegen * 32));
-    regenByte1 = brkMax & 0xFF;
-    regenByte2 = (brkMax >> 8) & 0xFF;
-
-    msg.id = 0x601; //set parameter ID
-    msg.len = 8;
-    msg.buf[0] = 0x40; //CMD SET
-    msg.buf[1] = 0x00;
-    msg.buf[2] = 0x20;
-    msg.buf[3] = 56;//index
-    msg.buf[4] = regenByte1;
-    msg.buf[5] = regenByte2;
-    msg.buf[6] = 0xFF;
-    msg.buf[7] = 0xFF;
-    Can0.write(msg);
-
+    brkMax = ((neg - (baseRegen * 32)) / 32);
+    canSet(56, brkMax);
 }
+
 
 void idleThrottle() {
+
     if (run == 0) {
-        msg.id = 0x601; //set parameter ID
-        msg.len = 8;
-        msg.buf[0] = 0x40; //CMD
-        msg.buf[1] = 0x00; //
-        msg.buf[2] = 0x20; //
-        msg.buf[3] = 64;
-        msg.buf[4] = 0x20;
-        msg.buf[5] = 0x00;//value x 32
-        msg.buf[6] = 0x00;
-        msg.buf[7] = 0x00;
-        Can0.write(msg);
+        canSet(64, 1);
     }
-
     else {
-        msg.id = 0x601; //set parameter ID
-        msg.len = 8;
-        msg.buf[0] = 0x40; //CMD
-        msg.buf[1] = 0x00; //
-        msg.buf[2] = 0x20; //
-        msg.buf[3] = 64;
-        msg.buf[4] = 0x00;
-        msg.buf[5] = 0x00;//value x 32
-        msg.buf[6] = 0x00;
-        msg.buf[7] = 0x00;
-        Can0.write(msg);
+        canSet(64, 0);
     }
-
-
-
 
     idleRamp.add(pot2);
-    //idleThrot = map(pot2, 600, 1150, (27 * 32), 0);
-    idleThrot = map(idleRamp.get(), 600, 1150, (27 * 32), 0);
-    iThrotByte1 = idleThrot & 0xFF;
-    iThrotByte2 = (idleThrot >> 8) & 0xFF;
+    idleThrot = map(idleRamp.get(), 600, 1150, 27, 0);
+    canSet(63, idleThrot);
+
+    if (pot2 > 1550) {
+        idleRPM = map(pot2, 1550, 3900, 1750, 0);
+    }
+    else {
+        idleRPM = 1750;
+    }
+    canSet(62, idleRPM);
+
+}
+
+void canSet(int index, float value) {
+    int val = (value * 32);
+    int byte1;
+    int byte2;
+    int byte3;
+    int byte4;
+    byte1 = val & 0xFF;
+    byte2 = (val >> 8) & 0xFF;
+    byte3 = (val >> 16) & 0xFF;
+    byte4 = (val >> 24) & 0xFF;
 
     msg.id = 0x601; //set parameter ID
     msg.len = 8;
-    msg.buf[0] = 0x40; //CMD
+    msg.buf[0] = 0x40;
     msg.buf[1] = 0x00;
-    msg.buf[2] = 0x20; //
-    msg.buf[3] = 63;//index idlethrotlim
-    msg.buf[4] = iThrotByte1;
-    msg.buf[5] = iThrotByte2;
-    msg.buf[6] = 0x00;
-    msg.buf[7] = 0x00;
+    msg.buf[2] = 0x20;
+    msg.buf[3] = index;
+    msg.buf[4] = byte1;
+    msg.buf[5] = byte2;
+    msg.buf[6] = byte3;
+    msg.buf[7] = byte4;
     Can0.write(msg);
 }
+
 
 
 
