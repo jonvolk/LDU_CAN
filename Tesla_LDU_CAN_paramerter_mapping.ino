@@ -178,7 +178,13 @@ void parameterMap() {
     fweak = 258;
     canSet(1, fweak);
 
-    fslipmin = (((400 - packVolt) / 100) + 1) * .82;  //base fslipmin value here is .82, this is increaed as pack voltage decreases
+    //fslipmin
+    if (rpm < 200) {
+        fslipmin = (((400 - packVolt) / 100) + 1) * .89;
+    }
+    else {
+        fslipmin = (((400 - packVolt) / 100) + 1) * .69;
+    }
     canSet(4, fslipmin);
 
     //fslipmax
