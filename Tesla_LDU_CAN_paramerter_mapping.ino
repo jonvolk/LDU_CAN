@@ -42,7 +42,6 @@ int dir = 0;
 int brake;
 int boost;
 int maxBoost;
-int throtRamp;
 int pot2;
 int fweak;
 int minBoost;
@@ -51,7 +50,6 @@ int brkMax;
 int baseRegen;
 int maxRegen;
 int idleThrot;
-int ampMin;
 int slipstart;
 int idleRPM;
 int idleThrotMax;
@@ -61,6 +59,8 @@ float maxSlip;
 float minSlip;
 float fslip;
 float fslipmin;
+float ampMin;
+float throtRamp;
 bool startup;
 
 
@@ -106,8 +106,8 @@ void loop() {
         decodeCAN();
     }
 
-    //parameterMap();
-    //boostMap();
+    parameterMap();
+    boostMap();
     idleThrottle();
     //regenStuff();
    
