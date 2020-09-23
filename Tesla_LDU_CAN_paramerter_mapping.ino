@@ -1,3 +1,25 @@
+/* 
+Welcome to the dumpster fire. 
+CAN mapping of Open Inverter LDU parameters for refinded driveability and power
+Must use brake pressure input on POT2! Parameter index values based on SINE Firmware 4.90.R!
+
+Openinverter custom CAN mapping.
+opmode,310,0,8,1,TX
+udc, 310,8,16,1,TX
+rpm,309,0,16,1,TX
+pot,275,0,16,1,TX
+pot2,275,16,16,TX
+din_brake,79,8,1,TX
+
+All other parameters are set via CAN SDO standard in the flollowing code
+Not responsible for injury, disappointment, depression or death
+
+Jon Volk 2020
+
+.*/
+
+
+
 #include <Arduino.h>
 #include <FlexCAN.h> //https://github.com/teachop/FlexCAN_Library 
 #include <Smoothed.h> //https://github.com/MattFryer/Smoothed
@@ -32,6 +54,8 @@ int idleThrot;
 int ampMin;
 int slipstart;
 int idleRPM;
+int idleThrotMax;
+int packVolt;
 int neg = 4294967295;
 float maxSlip;
 float minSlip;
@@ -82,10 +106,10 @@ void loop() {
         decodeCAN();
     }
 
-    parameterMap();
-    boostMap();
+    //parameterMap();
+    //boostMap();
     idleThrottle();
-    regenStuff();
+    //regenStuff();
    
 }
 
@@ -107,11 +131,11 @@ void decodeCAN() {
         rpm = (((inMsg.buf[1] << 8) + inMsg.buf[0]));
 
         if ((inMsg.buf[4]) > 0) {
-            mtemp = (inMsg.buf[4]);
+            mtemp = (inMsg.buf[4]); //motor temp C
         }
 
         if ((inMsg.buf[5]) > 0) {
-            hstemp = (inMsg.buf[5]);
+            hstemp = (inMsg.buf[5]); //heatsink temp C
         }
         if ((((inMsg.buf[7] << 8)) + inMsg.buf[6]) <= 2000) {
             potnom = (((inMsg.buf[7] << 8)) + inMsg.buf[6]);
@@ -123,22 +147,23 @@ void decodeCAN() {
 
     else if (inMsg.id == 79) {
 
-        dir = (inMsg.buf[0]);
-        brake = (inMsg.buf[1]);
+        dir = (inMsg.buf[0]);  
+        brake = (inMsg.buf[1]); //din brake
 
     }
 
     else if (inMsg.id == 0x136) {
 
-        run = (inMsg.buf[0]);
+        run = (inMsg.buf[0]); //opmode
+        packVolt = ((inMsg.buf[2] << 8) + inMsg.buf[1]); //UDC
     }
-
 
     else if (inMsg.id == 0x113) {
-        pot = ((inMsg.buf[1] << 8) + inMsg.buf[0]);
+        pot = ((inMsg.buf[1] << 8) + inMsg.buf[0]); 
         pot2 = ((inMsg.buf[3] << 8) + inMsg.buf[2]);
     }
-   
+
+
 }
 
 
@@ -146,49 +171,57 @@ void decodeCAN() {
 void parameterMap() {
 
     //boost
-    maxBoost = 1720;
-    minBoost = 1360;
+    maxBoost = 1770;
+    minBoost = 1400;
 
     //fweak
     fweak = 258;
     canSet(1, fweak);
 
-
-    //fslipmin
-    fslipmin = .84;
+    fslipmin = (((400 - packVolt) / 100) + 1) * .82;  //base fslipmin value here is .82, this is increaed as pack voltage decreases
     canSet(4, fslipmin);
 
     //fslipmax
-    maxSlip = (3.08 * 32);
+    maxSlip = (3.08 * 32); //fslipmax value * 32
     if (pot >= 2800) {
-        minSlip = map(pot, 2800, 4095, fslipmin * 32, maxSlip);
+        minSlip = map(pot, 2800, 4095, (fslipmin * 32), maxSlip);  
 
     }
-    else { minSlip = fslipmin *32 ; }
+    else { minSlip = (fslipmin * 32); }
 
     if (rpm <= 4500) {
-        fslip = map(rpm, 0, 4200, minSlip, maxSlip);
+        fslip = map(rpm, 0, 4200, minSlip, maxSlip);  // limits fslipmax at lower rpm to avoid surging
     }
     else { fslip = maxSlip; }
 
-    fslipRamp.add(fslip);
-    canSet(5, fslipRamp.get()/32);
+    //fslipRamp.add(fslip);
+    canSet(5, fslip / 32);
 
     // throtramp
-    throtRamp = 25;
+    if (pot < 1500) {   //set throtramp to 1 under 1500 pot value to smooth transient throttle 
+        throtRamp = 1;
+    }
+    if (pot >= 1500 && pot < 3000) {
+        throtRamp = map(pot, 1500, 3000, 1, 25); 
+    }
+    else {
+        throtRamp = 25;
+    }
+
     canSet(49, throtRamp);
 
     //ampmin
-    ampMin = 1;
+    ampMin = 1.2;
     canSet(51, ampMin);
 
 
     //slipstart
-    slipstart = 29;
+    slipstart = 34;
     canSet(52, slipstart);
 
+
 }
-void boostMap()
+void boostMap()  //sets boost lower for startup without OC trip, ramps higher with throttle for increased power
 {
     if (pot > 3700) {
         boost = map(pot, 3700, 4095, minBoost, maxBoost);
@@ -203,14 +236,23 @@ void boostMap()
 
 void regenStuff() {
 
-    baseRegen = 45;
+    // This method allows both pedal off regen in combination with variable pot2 value. Previously was not able to achieve this with recent firmware.
+
+    baseRegen = 0; //base throttle off regen value
+    maxRegen = 90;  //maximum full brake pressure regen value
+
 
     //brakenompedal
+    /*if (rpm <= 2000) {
+        brkNomPedal = map(rpm, 0, 2000, ((neg - (1 * 32)) / 32), ((neg - (baseRegen * 32))) / 32);  //reduces pedal regen with speed below 2,000 rpm.
+
+    }  */
+
     if (pot2 > 3700) {
-        brkNomPedal = ((neg - (maxRegen * 32)) / 32);
+        brkNomPedal = ((neg - (maxRegen * 32)) / 32); //sets POT2 value for maximum regen
     }
     else {
-        brkNomPedal = map(pot2, 600, 3700, ((neg - (baseRegen * 32)) / 32), ((neg - (maxRegen * 32))) / 32);
+        brkNomPedal = map(pot2, 600, 3700, ((neg - (baseRegen * 32)) / 32), ((neg - (maxRegen * 32))) / 32); //maps brake pedal regen between base and max
     }
     canSet(53, brkNomPedal);
 
@@ -223,33 +265,33 @@ void regenStuff() {
 void idleThrottle() {
 
     if (run == 0) {
-        canSet(64, 1);
+        canSet(64, 1);  // Sets idlemode to brakeoff when inverter is not in opmode "run"
     }
     else {
-        canSet(64, 0);
+        canSet(64, 0); //Sets idlemode to alwayson when inverter is in "run"
     }
+
+
 
     idleRamp.add(pot2);
-    idleThrot = map(idleRamp.get(), 600, 1150, 27, 0);
+    idleThrot = map(idleRamp.get(), 600, 1020, idleThrotMax, 0);
     canSet(63, idleThrot);
 
-    if (pot2 > 1550) {
-        idleRPM = map(pot2, 1550, 3900, 1750, 0);
-    }
-    else {
-        idleRPM = 1750;
-    }
+
+    idleRPM = 1750;
     canSet(62, idleRPM);
+
+    idleThrotMax = 24; // sets max idle throttle 
 
 }
 
 void canSet(int index, float value) {
-    int val = (value * 32);
+    int val = (value * 32);  //scale value * 32 to make STM32 happy
     int byte1;
     int byte2;
     int byte3;
     int byte4;
-    byte1 = val & 0xFF;
+    byte1 = val & 0xFF;  //bitshifting
     byte2 = (val >> 8) & 0xFF;
     byte3 = (val >> 16) & 0xFF;
     byte4 = (val >> 24) & 0xFF;
@@ -259,7 +301,7 @@ void canSet(int index, float value) {
     msg.buf[0] = 0x40;
     msg.buf[1] = 0x00;
     msg.buf[2] = 0x20;
-    msg.buf[3] = index;
+    msg.buf[3] = index; //index value of parameter, boost = 0
     msg.buf[4] = byte1;
     msg.buf[5] = byte2;
     msg.buf[6] = byte3;
@@ -285,4 +327,3 @@ The value is the desired value * 32. So if you want to set boost to 2000 you wou
 Id    Len cmd  index     subindex data
 0x601 8   0x40 0x00 0x20 0x00     0x00 0xFA 0x00 0x00
 */
-
