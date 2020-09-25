@@ -106,8 +106,8 @@ void loop() {
         decodeCAN();
     }
 
-    parameterMap();
-    boostMap();
+    //parameterMap();
+    //boostMap();
     idleThrottle();
     //regenStuff();
    
@@ -172,59 +172,71 @@ void parameterMap() {
 
     //boost
     maxBoost = 1770;
-    minBoost = 1400;
+    minBoost = 1720;
 
     //fweak
-    fweak = 258;
+    if (pot > 1800 && pot < 3200) {
+        fweak = map(pot, 1800, 3200, 400, 258);
+    }
+    else if (pot >= 3200) {
+
+        fweak = 258;
+    }
+    else {
+        fweak = 400;
+    }
     canSet(1, fweak);
 
+
     //fslipmin
-    if (rpm < 200) {
+    /*if (rpm < 200) {
         fslipmin = (((400 - packVolt) / 100) + 1) * .89;
     }
     else {
-        fslipmin = (((400 - packVolt) / 100) + 1) * .69;
-    }
+        fslipmin = (((400 - packVolt) / 100) + 1) * .68;
+    }*/
+    fslipmin = (((400 - packVolt) / 100) + 1) * 1.85;
     canSet(4, fslipmin);
 
+
     //fslipmax
-    maxSlip = (3.08 * 32); //fslipmax value * 32
+    maxSlip = (3.08 * 32);
     if (pot >= 2800) {
-        minSlip = map(pot, 2800, 4095, (fslipmin * 32), maxSlip);  
+        minSlip = map(pot, 2800, 4095, (fslipmin * 32), maxSlip);
 
     }
     else { minSlip = (fslipmin * 32); }
 
     if (rpm <= 4500) {
-        fslip = map(rpm, 0, 4200, minSlip, maxSlip);  // limits fslipmax at lower rpm to avoid surging
+        fslip = map(rpm, 0, 4200, minSlip, maxSlip);
     }
     else { fslip = maxSlip; }
 
     //fslipRamp.add(fslip);
     canSet(5, fslip / 32);
 
+
     // throtramp
-    if (pot < 1500) {   //set throtramp to 1 under 1500 pot value to smooth transient throttle 
-        throtRamp = 1;
+
+    if (pot < 1500) {
+        throtRamp = .45;
     }
-    if (pot >= 1500 && pot < 3000) {
-        throtRamp = map(pot, 1500, 3000, 1, 25); 
+    else if (pot >= 1500 && pot < 3000) {
+        throtRamp = map(pot, 1500, 3700, .5, 15);
     }
     else {
         throtRamp = 25;
+
+        canSet(49, throtRamp);
+
+        //slipstart
+        slipstart = 32;
+        canSet(52, slipstart);
+
+        //ampmin
+        ampMin = 1.1;
+        canSet(51, ampMin);
     }
-
-    canSet(49, throtRamp);
-
-    //ampmin
-    ampMin = 1.2;
-    canSet(51, ampMin);
-
-
-    //slipstart
-    slipstart = 34;
-    canSet(52, slipstart);
-
 
 }
 void boostMap()  //sets boost lower for startup without OC trip, ramps higher with throttle for increased power
@@ -277,17 +289,20 @@ void idleThrottle() {
         canSet(64, 0); //Sets idlemode to alwayson when inverter is in "run"
     }
 
-
-
     idleRamp.add(pot2);
     idleThrot = map(idleRamp.get(), 600, 1020, idleThrotMax, 0);
     canSet(63, idleThrot);
 
 
+    if (packVolt > 390) {
+        idleThrotMax = map(packVolt, 400, 390, 20, 24);
+    }
+    else {
+        idleThrotMax = 24; // sets max idle throttle 
+    }
+
     idleRPM = 1750;
     canSet(62, idleRPM);
-
-    idleThrotMax = 24; // sets max idle throttle 
 
 }
 
