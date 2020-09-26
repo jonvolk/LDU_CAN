@@ -19,3 +19,5 @@ din_brake,79,8,1,TX
 
 All other parameters are set via CAN SDO standard.
 
+9/26/20: Had a bit of a breakthrough mapping fweak to pot. Enables strong/smooth startup without oscillation throughout the full SOC. 
+
