@@ -106,8 +106,8 @@ void loop() {
         decodeCAN();
     }
 
-    //parameterMap();
-    //boostMap();
+    parameterMap();
+    boostMap();
     idleThrottle();
     //regenStuff();
    
@@ -171,7 +171,7 @@ void decodeCAN() {
 void parameterMap() {
 
     //boost
-    maxBoost = 1770;
+    maxBoost = 1720;
     minBoost = 1720;
 
     //fweak
@@ -187,17 +187,9 @@ void parameterMap() {
     }
     canSet(1, fweak);
 
-
     //fslipmin
-    /*if (rpm < 200) {
-        fslipmin = (((400 - packVolt) / 100) + 1) * .89;
-    }
-    else {
-        fslipmin = (((400 - packVolt) / 100) + 1) * .68;
-    }*/
-    fslipmin = (((400 - packVolt) / 100) + 1) * 1.85;
+    fslipmin = 2.3;
     canSet(4, fslipmin);
-
 
     //fslipmax
     maxSlip = (3.08 * 32);
@@ -293,17 +285,10 @@ void idleThrottle() {
     idleThrot = map(idleRamp.get(), 600, 1020, idleThrotMax, 0);
     canSet(63, idleThrot);
 
-
-    if (packVolt > 390) {
-        idleThrotMax = map(packVolt, 400, 390, 20, 24);
-    }
-    else {
-        idleThrotMax = 24; // sets max idle throttle 
-    }
+    idleThrotMax = 22;
 
     idleRPM = 1750;
     canSet(62, idleRPM);
-
 }
 
 void canSet(int index, float value) {
