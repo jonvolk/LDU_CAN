@@ -110,6 +110,8 @@ void loop() {
     boostMap();
     idleThrottle();
     //regenStuff();
+    debug();
+
    
 }
 
@@ -285,7 +287,7 @@ void idleThrottle() {
     idleThrot = map(idleRamp.get(), 600, 1020, idleThrotMax, 0);
     canSet(63, idleThrot);
 
-    idleThrotMax = 22;
+    idleThrotMax = 15;
 
     idleRPM = 1750;
     canSet(62, idleRPM);
@@ -316,6 +318,15 @@ void canSet(int index, float value) {
 }
 
 
+void debug() {
+
+    Serial.print("Pot val:");
+    Serial.println(pot);
+    Serial.println("");
+    Serial.println("");
+    Serial.println("");
+ 
+}
 
 
 
