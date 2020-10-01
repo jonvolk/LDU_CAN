@@ -108,7 +108,7 @@ void loop() {
 
     parameterMap();
     boostMap();
-    idleThrottle();
+    //idleThrottle();
     //regenStuff();
     debug();
 
@@ -216,21 +216,21 @@ void parameterMap() {
         throtRamp = .45;
     }
     else if (pot >= 1500 && pot < 3000) {
-        throtRamp = map(pot, 1500, 3700, .5, 15);
+        throtRamp = map(pot, 1500, 3700, 1, 25);
     }
     else {
         throtRamp = 25;
 
-        canSet(49, throtRamp);
-
-        //slipstart
-        slipstart = 32;
-        canSet(52, slipstart);
-
-        //ampmin
-        ampMin = 1.1;
-        canSet(51, ampMin);
     }
+    canSet(49, throtRamp);
+
+    //slipstart
+    slipstart = 32;
+    canSet(52, slipstart);
+
+    //ampmin
+    ampMin = 1.1;
+    canSet(51, ampMin);
 
 }
 void boostMap()  //sets boost lower for startup without OC trip, ramps higher with throttle for increased power
@@ -322,6 +322,10 @@ void debug() {
 
     Serial.print("Pot val:");
     Serial.println(pot);
+    Serial.print("Fslip:");
+    Serial.println(fslip/32);
+    Serial.print("Fweak:");
+    Serial.println(fweak);
     Serial.println("");
     Serial.println("");
     Serial.println("");
