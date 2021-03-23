@@ -37,7 +37,7 @@ int hstemp;
 int amps;
 int potnom;
 int pot;
-int run;
+int run = 0;
 int dir = 0;
 int brake;
 int boost;
