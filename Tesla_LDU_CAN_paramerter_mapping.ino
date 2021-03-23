@@ -109,7 +109,7 @@ void loop() {
     parameterMap();
     boostMap();
     idleThrottle();
-    //regenStuff();
+    regenStuff();
     debug();
 
    
