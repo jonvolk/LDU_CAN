@@ -108,7 +108,7 @@ void loop() {
 
     parameterMap();
     boostMap();
-    //idleThrottle();
+    idleThrottle();
     //regenStuff();
     debug();
 
@@ -326,6 +326,8 @@ void debug() {
     Serial.println(fslip/32);
     Serial.print("Fweak:");
     Serial.println(fweak);
+    Serial.print("RUN:");
+    Serial.println(run);
     Serial.println("");
     Serial.println("");
     Serial.println("");
